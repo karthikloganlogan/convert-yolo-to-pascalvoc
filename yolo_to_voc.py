@@ -14,21 +14,10 @@ import numpy as np
 from os.path import join
 
 ## coco classes
-YOLO_CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-                'train', 'truck', 'boat', 'traffic light', 'fire', 'hydrant',
-                'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
-                'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
-                'giraffe', 'backpack', 'umbrella', 'handbag', 'tie',
-                'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-                'kite', 'baseball bat', 'baseball glove', 'skateboard',
-                'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
-                'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-                'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-                'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed',
-                'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
-                'keyboard', 'cell phone', 'microwave oven', 'toaster', 'sink',
-                'refrigerator', 'book', 'clock', 'vase', 'scissors',
-                'teddy bear', 'hair drier', 'toothbrush')
+YOLO_CLASSES = ("Cross_crack","Dry_shouldering","Micro_crack"
+                ,"Non_defective_cell","Pin_crack","Solar_Cell",
+                "dark_area","dead_cell"
+)
 
 ## converts the normalized positions  into integer positions
 def unconvert(class_id, width, height, x, y, w, h):
@@ -50,28 +39,39 @@ def xml_transform(root, classes):
     class_path  = join(root, 'labels')
     ids = list()
     l=os.listdir(class_path)
+    print("l",l)
     
     check = '.DS_Store' in l
     if check == True:
         l.remove('.DS_Store')
         
-    ids=[x.split('.')[0] for x in l]   
+    ids=["".join(x.split('.')[0:-1]) for x in l]   
+    print("ids",ids)
 
     annopath = join(root, 'labels', '%s.txt')
     imgpath = join(root, 'images', '%s.jpg')
     
     os.makedirs(join(root, 'outputs'), exist_ok=True)
     outpath = join(root, 'outputs', '%s.xml')
-
-    for i in range(len(ids)):
-        img_id = ids[i] 
+    error_images=[]
+    error_annotation=[]
+    for number,i in enumerate(range(len(ids))):
+        img_id = ids[i]
+        print("enumerate number",number)
+        print("img_id",img_id) 
         if img_id == "classes":
+            print("inside img_id clause")
             continue
         if os.path.exists(outpath % img_id):
             continue
         print(imgpath % img_id)
-        img= cv2.imread(imgpath % img_id)
-        height, width, channels = img.shape # pega tamanhos e canais das images
+        try:
+            img= cv2.imread(imgpath % img_id)
+            print("img",img.shape)
+            height, width, channels = img.shape # pega tamanhos e canais das images
+        except:
+            error_images.append(img_id)
+            continue
 
         node_root = Element('annotation')
         node_folder = SubElement(node_root, 'folder')
@@ -100,7 +100,12 @@ def xml_transform(root, classes):
 
         target = (annopath % img_id)
         if os.path.exists(target):
-            label_norm= np.loadtxt(target).reshape(-1, 5)
+            try :
+                label_norm= np.loadtxt(target).reshape(-1, 5)
+            except:
+                error_annotation.append(img_id)
+                os.remove(imgpath % img_id)
+                continue
 
             for i in range(len(label_norm)):
                 labels_conv = label_norm[i]
@@ -134,6 +139,9 @@ def xml_transform(root, classes):
         #os.remove(target)
         f.write(xml)
         f.close()     
-       
+    print("error_images",error_images,len(error_images))
+    print("error_annotaion",error_annotation,len(error_annotation))
+
 
 xml_transform(ROOT, YOLO_CLASSES)
+
